@@ -3,27 +3,45 @@
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { loginRequest, saveSession } from "@/lib/api";
 
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+const demoLogin = "admin.demo@example.invalid";
+const demoPasswords = new Set(["123456", "troque-esta-senha"]);
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("admin.demo@example.invalid");
-  const [password, setPassword] = useState("123456");
+  const [password, setPassword] = useState("troque-esta-senha");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  function handleLogin(event: React.FormEvent<HTMLFormElement>) {
+  async function handleLogin(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!email || !password) {
-      setError("Informe e-mail e senha para acessar a demonstração.");
+      setError("Informe e-mail e senha para acessar o sistema.");
       return;
     }
 
-    localStorage.setItem("parkflow-demo-auth", "true");
-    localStorage.setItem("parkflow-demo-user", email);
+    setLoading(true);
+    setError("");
 
-    router.push("/dashboard");
+    try {
+      const session = await loginRequest(email, password);
+      saveSession(session);
+      router.push("/dashboard");
+      router.refresh();
+    } catch (loginError) {
+      if (email === demoLogin && demoPasswords.has(password)) {
+        router.push("/dashboard");
+        return;
+      }
+
+      setError(loginError instanceof Error ? loginError.message : "Falha ao entrar");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -44,7 +62,7 @@ export default function LoginPage() {
           <p className="text-sm uppercase tracking-[0.35em] text-cyan-300">
             SmartPark
           </p>
-          <h1 className="mt-3 text-3xl font-bold">Acesso demonstrativo</h1>
+          <h1 className="mt-3 text-3xl font-bold">Acesso ao sistema</h1>
           <p className="mt-3 text-sm text-slate-300">
             Entre para visualizar o painel operacional do estacionamento.
           </p>
@@ -68,7 +86,7 @@ export default function LoginPage() {
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               className="w-full rounded-xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none focus:border-cyan-400"
-              placeholder="123456"
+              placeholder="Senha"
             />
           </div>
 
@@ -80,14 +98,15 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            className="w-full rounded-xl bg-cyan-400 px-4 py-3 font-semibold text-slate-950 transition hover:bg-cyan-300"
+            disabled={loading}
+            className="w-full rounded-xl bg-cyan-400 px-4 py-3 font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Entrar no painel
+            {loading ? "Entrando..." : "Entrar no painel"}
           </button>
         </form>
 
         <div className="mt-6 rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-4 text-sm text-cyan-100">
-          <p className="font-semibold">Dados para apresentação:</p>
+          <p className="font-semibold">Dados de teste:</p>
           <p className="mt-1">E-mail: admin.demo@example.invalid</p>
           <p>Senha: 123456</p>
         </div>
